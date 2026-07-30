@@ -345,5 +345,96 @@
         },
         "previous_hash": "59b6d8ea1426a4c4e5bb5dde08454e03f0c11258d4d60e797769212fd20322ad",
         "hash": "0059dbdf05022a3501ae89437eb97475e0babb6500d81377cad91c9730452a4d"
+    },
+    {
+        "index": 27,
+        "timestamp": 1785403329.6669087,
+        "audit_data": {
+            "session_id": "NET-AE091322",
+            "key_length": 102,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403329.664295
+        },
+        "previous_hash": "0059dbdf05022a3501ae89437eb97475e0babb6500d81377cad91c9730452a4d",
+        "hash": "01af588eab908d5d8100b27c58fdaf22c95280df6dfbdde51a0d5a71db8aea1b"
+    },
+    {
+        "index": 28,
+        "timestamp": 1785403654.0148818,
+        "audit_data": {
+            "session_id": "NET-B84E002A",
+            "key_length": 95,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403654.0139105
+        },
+        "previous_hash": "01af588eab908d5d8100b27c58fdaf22c95280df6dfbdde51a0d5a71db8aea1b",
+        "hash": "73a9a8b2907531841dc1139776d88d743085c9a1f0a9fa348a84cf0c3db39e8e"
+    },
+    {
+        "index": 29,
+        "timestamp": 1785403672.9597511,
+        "audit_data": {
+            "session_id": "NET-5CF36854",
+            "key_length": 103,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403672.9592893
+        },
+        "previous_hash": "73a9a8b2907531841dc1139776d88d743085c9a1f0a9fa348a84cf0c3db39e8e",
+        "hash": "ccd7112b39a7b1435c0cec33daf72d996cd32fb591af32fbbe026a77b5855b43"
+    },
+    {
+        "index": 30,
+        "timestamp": 1785403703.4393826,
+        "audit_data": {
+            "session_id": "NET-D0018E33",
+            "key_length": 105,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403703.4390016
+        },
+        "previous_hash": "ccd7112b39a7b1435c0cec33daf72d996cd32fb591af32fbbe026a77b5855b43",
+        "hash": "753160f53a043be82c1a970ee36736d46d6af2019a8e81438c2f06e1082733fe"
+    },
+    {
+        "index": 31,
+        "timestamp": 1785403717.6334155,
+        "audit_data": {
+            "session_id": "NET-DAF1740F",
+            "key_length": 103,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403717.6326215
+        },
+        "previous_hash": "753160f53a043be82c1a970ee36736d46d6af2019a8e81438c2f06e1082733fe",
+        "hash": "893daf078a7f045f245c5a14c32521aa3315a00e83dbb71bbd19bb78de0b8637"
+    },
+    {
+        "index": 32,
+        "timestamp": 1785403721.051335,
+        "audit_data": {
+            "session_id": "NET-A147AB32",
+            "key_length": 97,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403721.0503857
+        },
+        "previous_hash": "893daf078a7f045f245c5a14c32521aa3315a00e83dbb71bbd19bb78de0b8637",
+        "hash": "883597a8a86b5a7ada568f1674527e10fcf83204ca9b40ad563cda70d2972a31"
+    },
+    {
+        "index": 33,
+        "timestamp": 1785403793.3582323,
+        "audit_data": {
+            "session_id": "NET-CB6D2FE9",
+            "key_length": 104,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785403793.3569996
+        },
+        "previous_hash": "883597a8a86b5a7ada568f1674527e10fcf83204ca9b40ad563cda70d2972a31",
+        "hash": "a6527a19e076785a8bab31e919141ade8a04258b36e4c62cb866c945fe6750e9"
     }
 ]

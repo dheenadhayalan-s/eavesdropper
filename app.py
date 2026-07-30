@@ -721,7 +721,9 @@ with tab_net:
         # Initialize network listener in session_state before rendering fragments
         _port_init = 8502
         if "network_listener" not in st.session_state:
-            st.session_state.network_listener = QKDNetworkListener(host="0.0.0.0", port=_port_init)
+            nl = QKDNetworkListener(host="0.0.0.0", port=_port_init)
+            nl.start()
+            st.session_state.network_listener = nl
 
         b_col1, b_col2 = st.columns([1, 1])
         with b_col1:
@@ -737,11 +739,13 @@ with tab_net:
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
                 if st.button("▶ Start Receiver Listener", type="primary" if not listener.is_running else "secondary", key="btn_start_listen", use_container_width=True):
-                    listener.start()
+                    if not listener.is_running:
+                        listener.start()
                     st.rerun()
             with btn_col2:
                 if st.button("🛑 Stop Listener", key="btn_stop_listen", use_container_width=True):
-                    listener.stop()
+                    if listener.is_running:
+                        listener.stop()
                     st.rerun()
 
             # --- Live status + log panel: refreshes every 1 second without blocking ---
