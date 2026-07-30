@@ -1,0 +1,89 @@
+[
+    {
+        "index": 0,
+        "timestamp": 1700000000.0,
+        "audit_data": {
+            "message": "Genesis Block - Secure Quantum Audit Trail Initiated"
+        },
+        "previous_hash": "0",
+        "hash": "229198f5e1f69034a29b3f8de41447f3f2808fc252353210add1826d3336db33"
+    },
+    {
+        "index": 1,
+        "timestamp": 1785385766.4616506,
+        "audit_data": {
+            "session_id": "LIVE-34F1B3",
+            "key_length": 16,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785385766.4592097
+        },
+        "previous_hash": "229198f5e1f69034a29b3f8de41447f3f2808fc252353210add1826d3336db33",
+        "hash": "5e7942ea132785d185f9779cb974b8bf5b8c07aba9c8665bd52089cba4a15ad1"
+    },
+    {
+        "index": 2,
+        "timestamp": 1785385928.105668,
+        "audit_data": {
+            "session_id": "BATCH-11D6B8",
+            "key_length": 502,
+            "qber": 0.013972055888223553,
+            "eve_detected": false,
+            "timestamp": 1785385928.0934458
+        },
+        "previous_hash": "5e7942ea132785d185f9779cb974b8bf5b8c07aba9c8665bd52089cba4a15ad1",
+        "hash": "7ae3c0dbd0a1710771c6e4077e0330a626d20fcc9a10c1f2f545072d62447477"
+    },
+    {
+        "index": 3,
+        "timestamp": 1785387901.1691804,
+        "audit_data": {
+            "session_id": "LIVE-EDEF0C",
+            "key_length": 6,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785387901.1686242
+        },
+        "previous_hash": "7ae3c0dbd0a1710771c6e4077e0330a626d20fcc9a10c1f2f545072d62447477",
+        "hash": "9baea9489234dff2f67c998393e6332d4f167a04f9311f79ff307adf23ea62af"
+    },
+    {
+        "index": 4,
+        "timestamp": 1785395169.5887983,
+        "audit_data": {
+            "session_id": "NET-4CA60F15",
+            "key_length": 51,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785395169.588389
+        },
+        "previous_hash": "9baea9489234dff2f67c998393e6332d4f167a04f9311f79ff307adf23ea62af",
+        "hash": "3476b0d14808adf781de70411862bc14b02b2106ff60d178f7c6798ead25eac4"
+    },
+    {
+        "index": 5,
+        "timestamp": 1785395173.5789497,
+        "audit_data": {
+            "session_id": "NET-C15F4294",
+            "key_length": 49,
+            "qber": 0.22448979591836735,
+            "eve_detected": true,
+            "timestamp": 1785395173.5783098
+        },
+        "previous_hash": "3476b0d14808adf781de70411862bc14b02b2106ff60d178f7c6798ead25eac4",
+        "hash": "2ec347a169a5bd34ddcba49af5b60ff49ad667b9aeb853bc41a35c8194d25841"
+    },
+    {
+        "index": 6,
+        "timestamp": 1785395313.8235705,
+        "audit_data": {
+            "session_id": "NET-579D721E",
+            "key_length": 66,
+            "qber": 0.18461538461538463,
+            "eve_detected": true,
+            "timestamp": 1785395313.823162
+        },
+        "previous_hash": "2ec347a169a5bd34ddcba49af5b60ff49ad667b9aeb853bc41a35c8194d25841",
+        "hash": "9d163e5af8f58b893fff7335b017e41e035f62b0aa80bb701605a79ec97cf1e7"
+    }
+]
