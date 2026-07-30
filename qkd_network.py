@@ -328,6 +328,10 @@ class QKDNetworkListener:
                 conn.close()
                 return
 
+            # Print first 10 bits of the final key for debugging key consistency across laptops
+            key_preview_bob = "".join(str(b) for b in final_key_bits_bob[:10])
+            self.log(f"🔑 [DEBUG] Bob's Final Key (first 10 bits): {key_preview_bob} (len: {len(final_key_bits_bob)})")
+
             self.log(f"✅ QKD KEY ESTABLISHED SECURELY! Key length: {len(final_key_bits_bob)} bits. Waiting for encrypted file payload...")
 
             # 4. Receive Encrypted File Payload
@@ -514,6 +518,10 @@ def transmit_file_over_qkd(
                 "is_secure": False,
                 "error": f"Transmission Aborted: Eavesdropper detected! QBER {qber_pct:.2f}% exceeds threshold.",
             }
+
+        # Print first 10 bits of the final key for debugging key consistency across laptops
+        key_preview_alice = "".join(str(b) for b in final_key_bits_alice[:10])
+        log(f"🔑 [DEBUG] Alice's Final Key (first 10 bits): {key_preview_alice} (len: {len(final_key_bits_alice)})")
 
         log(f"✅ QKD KEY SECURE! QBER {qber_pct:.2f}% is safe. Deriving AES-256 key...")
 
