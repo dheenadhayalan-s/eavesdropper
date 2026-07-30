@@ -429,14 +429,29 @@ def transmit_file_over_qkd(
         alice_bits = rng.integers(0, 2, size=n_qubits).tolist()
         alice_bases = rng.integers(0, 2, size=n_qubits).tolist()
 
+        sent_bits = list(alice_bits)
+        sent_bases = list(alice_bases)
+
+        if eve_active:
+            log(f"🕵️ Eavesdropper (Eve) intercepting quantum channel at {eve_frac*100:.0f}% rate...")
+            for i in range(n_qubits):
+                if rng.random() < eve_frac:
+                    eve_basis = int(rng.integers(0, 2))
+                    if eve_basis == alice_bases[i]:
+                        eve_result = alice_bits[i]
+                    else:
+                        eve_result = int(rng.integers(0, 2))
+                    sent_bits[i] = eve_result
+                    sent_bases[i] = eve_basis
+
         log(f"⚛️ Initiating QKD session `{session_id}` with {n_qubits} qubits...")
 
         init_payload = {
             "type": "QKD_INIT",
             "session_id": session_id,
             "n_qubits": n_qubits,
-            "alice_bits": alice_bits,
-            "alice_bases": alice_bases,
+            "alice_bits": sent_bits,
+            "alice_bases": sent_bases,
             "file_metadata": {
                 "filename": file_name,
                 "size": len(file_bytes),

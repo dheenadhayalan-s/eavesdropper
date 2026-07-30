@@ -812,6 +812,10 @@ with tab_net:
             n_qubits_net = st.slider("QKD Qubits for Key Exchange", 100, 2000, 400, step=100, key="net_n_qubits")
             sample_frac_net = st.slider("QBER Sample Check Fraction", 0.1, 0.9, 0.5, step=0.1, key="net_sample_frac")
 
+            st.markdown("---")
+            eve_alice_toggle = st.toggle("🕵️ Simulate Eve Interception on Transmission Channel", value=False, key="net_alice_eve_toggle")
+            eve_alice_frac = st.slider("Eve Interception Rate", 0.1, 1.0, 1.0, step=0.1, disabled=not eve_alice_toggle, key="net_alice_eve_frac")
+
             btn_transmit = st.button("🚀 Transmit File via QKD ('Call Transmission')", type="primary", use_container_width=True, key="btn_transmit_net")
 
         with a_col2:
@@ -840,6 +844,8 @@ with tab_net:
                             file_bytes=file_bytes,
                             mime_type=mime_type,
                             n_qubits=n_qubits_net,
+                            eve_active=eve_alice_toggle,
+                            eve_frac=eve_alice_frac,
                             sample_fraction=sample_frac_net,
                             status_callback=update_status,
                         )
