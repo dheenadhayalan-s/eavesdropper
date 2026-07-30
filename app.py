@@ -859,12 +859,26 @@ with tab_net:
                             f"- **Session ID:** `{res['session_id']}`"
                         )
                     else:
-                        st.error(
-                            f"🚨 **TRANSMISSION ABORTED / FAILED!**\n\n"
-                            f"- **Reason:** {res.get('error', 'Unknown error')}\n"
-                            f"- **Measured QBER:** `{res.get('qber_pct', 0.0):.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                            f"- **Security Rule:** QKD key rejected due to quantum measurement disturbance."
-                        )
+                        is_sec = res.get("is_secure", None)
+                        qber_val = res.get("qber_pct", None)
+
+                        if is_sec is False and qber_val is not None:
+                            st.error(
+                                f"🚨 **QKD TRANSMISSION BLOCKED! (Eavesdropper Detected)**\n\n"
+                                f"- **Measured QBER:** `{qber_val:.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                                f"- **Security Decision:** QKD key rejected due to quantum measurement disturbance!\n"
+                                f"- **Details:** {res.get('error', 'Eavesdropper detected on quantum channel.')}"
+                            )
+                        else:
+                            st.error(
+                                f"🔌 **NETWORK CONNECTION FAILED**\n\n"
+                                f"- **Reason:** {res.get('error', 'Connection timed out or refused.')}\n"
+                                f"- **Troubleshooting Check:**\n"
+                                f"  1. Is the Receiver Listener started on `{target_ip}:{target_port}`?\n"
+                                f"  2. For **Bob direct connection**, use Port `8502`.\n"
+                                f"  3. For **Eve 3-Laptop Proxy**, click **▶ Start Eve Proxy Listener** on Laptop C (Port `8503`) first.\n"
+                                f"  4. Check if both laptops are on the same Wi-Fi / LAN network."
+                            )
             else:
                 st.info("Select target IP & file, then click **Transmit File via QKD** to begin.")
 
