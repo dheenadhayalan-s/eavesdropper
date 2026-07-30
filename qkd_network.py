@@ -537,7 +537,7 @@ def transmit_file_over_qkd(
             "encrypted_payload": encrypted_payload,
         }).encode("utf-8"))
 
-        # Receive ACK
+        # Receive ACK from receiver
         ack_raw = _recv_msg(s)
         if ack_raw:
             ack = json.loads(ack_raw.decode("utf-8"))
@@ -553,16 +553,25 @@ def transmit_file_over_qkd(
                     "file_size": len(file_bytes),
                     "is_secure": True,
                 }
+            else:
+                log(f"🚨 Receiver rejected file payload: {ack.get('status')}")
+                return {
+                    "success": False,
+                    "session_id": session_id,
+                    "qber": qber,
+                    "qber_pct": qber_pct,
+                    "is_secure": True,
+                    "error": f"Receiver decryption failed ({ack.get('status')})",
+                }
 
+        log("⚠️ File payload sent, but no confirmation ACK received from receiver.")
         return {
-            "success": True,
+            "success": False,
             "session_id": session_id,
             "qber": qber,
             "qber_pct": qber_pct,
-            "final_key_len": len(final_key_bits_alice),
-            "file_name": file_name,
-            "file_size": len(file_bytes),
             "is_secure": True,
+            "error": "File payload transmitted, but receiver failed to send delivery receipt ACK.",
         }
 
     except Exception as e:
@@ -762,6 +771,16 @@ class EveProxyListener:
                 })
 
                 _send_msg(alice_conn, bob_decision_raw)
+
+                if is_sec:
+                    # Relay encrypted file payload from Alice to Bob
+                    encrypted_file_raw = _recv_msg(alice_conn)
+                    if encrypted_file_raw:
+                        _send_msg(bob_socket, encrypted_file_raw)
+                        # Relay ACK from Bob back to Alice
+                        ack_raw = _recv_msg(bob_socket)
+                        if ack_raw:
+                            _send_msg(alice_conn, ack_raw)
 
         except Exception as e:
             self.log(f"🚨 Error in MITM proxy: {e}")
