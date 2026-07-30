@@ -718,15 +718,16 @@ with tab_net:
         st.markdown("### 📥 Laptop B: Receiver Mode (Bob)")
         st.caption("Listens on TCP port for incoming QKD key exchanges & encrypted file payloads.")
 
+        # Initialize network listener in session_state before rendering fragments
+        _port_init = 8502
+        if "network_listener" not in st.session_state:
+            st.session_state.network_listener = QKDNetworkListener(host="0.0.0.0", port=_port_init)
+
         b_col1, b_col2 = st.columns([1, 1])
         with b_col1:
             port_input = st.number_input("Listener Port", value=8502, step=1, key="net_port")
             eve_listener = st.toggle("🕵️ Simulate Local Eve Interception on Bob Channel", value=False, key="net_eve_listen")
             eve_frac_listen = st.slider("Eve Interception Rate", 0.0, 1.0, 1.0, step=0.1, disabled=not eve_listener, key="net_eve_frac")
-
-            # Initialize network listener in session_state if missing
-            if "network_listener" not in st.session_state:
-                st.session_state.network_listener = QKDNetworkListener(host="0.0.0.0", port=port_input)
 
             listener: QKDNetworkListener = st.session_state.network_listener
             listener.port = port_input
@@ -743,54 +744,67 @@ with tab_net:
                     listener.stop()
                     st.rerun()
 
-            if listener.is_running:
-                st.success(f"🟢 Receiver Listener ACTIVE on `0.0.0.0:{listener.port}` (Share IP `{local_ips[0]}`)")
-            else:
-                st.warning("🔴 Receiver Listener is currently STOPPED.")
-
-            with st.expander("📋 Bob's Real-Time Log Console", expanded=True):
-                if listener.logs:
-                    st.code("\n".join(listener.logs[-15:]), language="text")
+            # --- Live status + log panel: refreshes every 1 second without blocking ---
+            @st.fragment(run_every=1)
+            def bob_live_panel():
+                _listener = st.session_state.get("network_listener")
+                if _listener is None:
+                    return
+                if _listener.is_running:
+                    st.success(f"🟢 Receiver Listener ACTIVE on `0.0.0.0:{_listener.port}` (Share IP `{local_ips[0]}`)")
                 else:
-                    st.caption("No log events yet. Start listener and initiate transmission!")
+                    st.warning("🔴 Receiver Listener is currently STOPPED.")
+                with st.expander("📋 Bob's Real-Time Log Console", expanded=True):
+                    if _listener.logs:
+                        st.code("\n".join(_listener.logs[-15:]), language="text")
+                    else:
+                        st.caption("No log events yet. Start listener and initiate transmission!")
 
+            bob_live_panel()
+
+        # --- Received files workspace: also a fragment so it updates live ---
         with b_col2:
-            st.markdown("#### 📦 Received Files Workspace")
-            if listener.last_received_file:
-                rf = listener.last_received_file
-                st.success(f"🎉 **Received & Decrypted File:** `{rf['filename']}`")
-                
-                f_col1, f_col2 = st.columns(2)
-                f_col1.metric("File Size", f"{rf['size'] / 1024:.2f} KB" if rf['size'] > 1024 else f"{rf['size']} Bytes")
-                f_col2.metric("QKD QBER", f"{rf['qber']*100:.2f}%")
+            @st.fragment(run_every=1)
+            def bob_received_files():
+                _listener = st.session_state.get("network_listener")
+                st.markdown("#### 📦 Received Files Workspace")
+                if _listener and _listener.last_received_file:
+                    rf = _listener.last_received_file
+                    st.success(f"🎉 **Received & Decrypted File:** `{rf['filename']}`")
 
-                st.caption(f"Session ID: `{rf['session_id']}` | Status: {rf['status_msg']}")
+                    f_col1, f_col2 = st.columns(2)
+                    f_col1.metric("File Size", f"{rf['size'] / 1024:.2f} KB" if rf['size'] > 1024 else f"{rf['size']} Bytes")
+                    f_col2.metric("QKD QBER", f"{rf['qber']*100:.2f}%")
 
-                file_bytes = rf["data"]
-                fname = rf["filename"]
-                mime = rf.get("mime_type", "application/octet-stream")
+                    st.caption(f"Session ID: `{rf['session_id']}` | Status: {rf['status_msg']}")
 
-                st.download_button(
-                    label=f"💾 Download Received File ({fname})",
-                    data=file_bytes,
-                    file_name=fname,
-                    mime=mime,
-                    type="primary",
-                    key="dl_received_file",
-                    use_container_width=True
-                )
+                    file_bytes = rf["data"]
+                    fname = rf["filename"]
+                    mime = rf.get("mime_type", "application/octet-stream")
 
-                ext = fname.split(".")[-1].lower() if "." in fname else ""
-                if ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
-                    st.image(file_bytes, caption=f"Preview: {fname}", use_container_width=True)
-                elif ext in ["txt", "py", "json", "csv", "md", "log", "html", "css", "js"]:
-                    try:
-                        text_str = file_bytes.decode("utf-8")
-                        st.code(text_str[:2000] + ("\n... [truncated]" if len(text_str) > 2000 else ""), language=ext if ext != "txt" else "text")
-                    except Exception:
-                        pass
-            else:
-                st.info("No files received yet. Files transmitted by Alice will appear here after QKD key exchange!")
+                    st.download_button(
+                        label=f"💾 Download Received File ({fname})",
+                        data=file_bytes,
+                        file_name=fname,
+                        mime=mime,
+                        type="primary",
+                        key="dl_received_file_frag",
+                        use_container_width=True
+                    )
+
+                    ext = fname.split(".")[-1].lower() if "." in fname else ""
+                    if ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
+                        st.image(file_bytes, caption=f"Preview: {fname}", use_container_width=True)
+                    elif ext in ["txt", "py", "json", "csv", "md", "log", "html", "css", "js"]:
+                        try:
+                            text_str = file_bytes.decode("utf-8")
+                            st.code(text_str[:2000] + ("\n... [truncated]" if len(text_str) > 2000 else ""), language=ext if ext != "txt" else "text")
+                        except Exception:
+                            pass
+                else:
+                    st.info("No files received yet. Files transmitted by Alice will appear here after QKD key exchange!")
+
+            bob_received_files()
 
     # ------------------ SUB-TAB 2: TRANSMITTER (ALICE) ------------------
     with sub_alice:
@@ -813,86 +827,57 @@ with tab_net:
             sample_frac_net = st.slider("QBER Sample Check Fraction", 0.1, 0.9, 0.5, step=0.1, key="net_sample_frac")
 
             st.markdown("---")
-            st.markdown("##### 🚀 Transmission Controls")
             eve_alice_toggle = st.toggle("🕵️ Simulate Eve Interception on Transmission Channel", value=False, key="net_alice_eve_toggle")
             eve_alice_frac = st.slider("Eve Interception Rate", 0.1, 1.0, 1.0, step=0.1, disabled=not eve_alice_toggle, key="net_alice_eve_frac")
 
-            btn_col_a, btn_col_b = st.columns(2)
-            with btn_col_a:
-                btn_transmit = st.button("🚀 Transmit File via QKD", type="primary", use_container_width=True, key="btn_transmit_net")
-            with btn_col_b:
-                btn_attack_test = st.button("🚨 Run Eve Attack Test", type="secondary", use_container_width=True, key="btn_attack_test_net", help="Forces Eve interception ON to demonstrate ~25% QBER key rejection")
+            btn_transmit = st.button("🚀 Transmit File via QKD ('Call Transmission')", type="primary", use_container_width=True, key="btn_transmit_net")
 
         with a_col2:
             st.markdown("#### 📡 Transmission Output Console")
-            
-            # Trigger transmission if either button clicked
-            if btn_transmit or btn_attack_test:
-                # Force Eve active if attack test button pressed
-                active_eve = True if btn_attack_test else eve_alice_toggle
-                active_frac = eve_alice_frac if eve_alice_toggle else 1.0
-
-                if uploaded_file is not None:
+            if btn_transmit:
+                if uploaded_file is None:
+                    st.error("⚠️ Please select/upload a file first!")
+                else:
                     file_bytes = uploaded_file.getvalue()
                     file_name = uploaded_file.name
                     mime_type = uploaded_file.type or "application/octet-stream"
-                else:
-                    # Default sample payload for quick testing
-                    file_name = "qkd_confidential_sample.txt"
-                    file_bytes = f"🔒 CONFIDENTIAL EAVEGUARD QKD DATA STREAM\nSession: Demo Test Payload\nTimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\nContent: High-security quantum encrypted text document.".encode("utf-8")
-                    mime_type = "text/plain"
-                    st.info(f"ℹ️ Using default sample payload: `{file_name}` ({len(file_bytes)} bytes)")
 
-                st.markdown(f"**Starting transmission for file:** `{file_name}` ({len(file_bytes)} bytes)...")
-                status_box = st.empty()
-                log_lines = []
+                    st.markdown(f"**Starting transmission for file:** `{file_name}` ({len(file_bytes)} bytes)...")
+                    status_box = st.empty()
+                    log_lines = []
 
-                def update_status(msg):
-                    log_lines.append(msg)
-                    status_box.code("\n".join(log_lines[-8:]), language="text")
+                    def update_status(msg):
+                        log_lines.append(msg)
+                        status_box.code("\n".join(log_lines[-8:]), language="text")
 
-                with st.spinner("Executing QKD protocol over network socket..."):
-                    res = transmit_file_over_qkd(
-                        target_ip=target_ip,
-                        target_port=int(target_port),
-                        file_name=file_name,
-                        file_bytes=file_bytes,
-                        mime_type=mime_type,
-                        n_qubits=n_qubits_net,
-                        eve_active=active_eve,
-                        eve_frac=active_frac,
-                        sample_fraction=sample_frac_net,
-                        status_callback=update_status,
-                    )
+                    with st.spinner("Executing QKD protocol over network socket..."):
+                        res = transmit_file_over_qkd(
+                            target_ip=target_ip,
+                            target_port=int(target_port),
+                            file_name=file_name,
+                            file_bytes=file_bytes,
+                            mime_type=mime_type,
+                            n_qubits=n_qubits_net,
+                            eve_active=eve_alice_toggle,
+                            eve_frac=eve_alice_frac,
+                            sample_fraction=sample_frac_net,
+                            status_callback=update_status,
+                        )
 
-                if res.get("success"):
-                    st.success(
-                        f"🎉 **TRANSMISSION SUCCESSFUL!**\n\n"
-                        f"- File `{res['file_name']}` ({res['file_size']} bytes) transmitted securely!\n"
-                        f"- **Measured QBER:** `{res['qber_pct']:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                        f"- **AES-256 Key Established:** `{res['final_key_len']} bits`\n"
-                        f"- **Session ID:** `{res['session_id']}`"
-                    )
-                else:
-                    is_sec = res.get("is_secure", None)
-                    qber_val = res.get("qber_pct", None)
-
-                    if is_sec is False and qber_val is not None:
-                        st.error(
-                            f"🚨 **QKD TRANSMISSION BLOCKED! (Eavesdropper Detected)**\n\n"
-                            f"- **Measured QBER:** `{qber_val:.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                            f"- **Security Decision:** QKD key rejected due to quantum measurement disturbance!\n"
-                            f"- **Details:** {res.get('error', 'Eavesdropper detected on quantum channel.')}"
+                    if res.get("success"):
+                        st.success(
+                            f"🎉 **TRANSMISSION SUCCESSFUL!**\n\n"
+                            f"- File `{res['file_name']}` ({res['file_size']} bytes) transmitted securely!\n"
+                            f"- **Measured QBER:** `{res['qber_pct']:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                            f"- **AES-256 Key Established:** `{res['final_key_len']} bits`\n"
+                            f"- **Session ID:** `{res['session_id']}`"
                         )
                     else:
                         st.error(
-                            f"🔌 **NETWORK CONNECTION FAILED**\n\n"
-                            f"- **Reason:** {res.get('error', 'Connection timed out or refused.')}\n"
-                            f"- **Troubleshooting Check:**\n"
-                            f"  1. Is the Receiver Listener started on `{target_ip}:{target_port}`?\n"
-                            f"  2. For **Bob direct connection**, use Port `8502`.\n"
-                            f"  3. For **Eve 3-Laptop Proxy**, click **▶ Start Eve Proxy Listener** on Laptop C (Port `8503`) first.\n"
-                            f"  4. Check if both laptops are on the same Wi-Fi / LAN network."
+                            f"🚨 **TRANSMISSION ABORTED / FAILED!**\n\n"
+                            f"- **Reason:** {res.get('error', 'Unknown error')}\n"
+                            f"- **Measured QBER:** `{res.get('qber_pct', 0.0):.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                            f"- **Security Rule:** QKD key rejected due to quantum measurement disturbance."
                         )
             else:
                 st.info("Select target IP & file, then click **Transmit File via QKD** to begin.")
@@ -902,22 +887,20 @@ with tab_net:
         st.markdown("### 🕵️ Laptop C: Man-In-The-Middle Proxy Mode (Eve)")
         st.caption("Runs on Laptop 3. Intercepts quantum qubits sent by Alice, measures in guessed bases, and forwards collapsed states to Bob.")
 
+        # Initialize Eve Proxy Listener in session_state before fragments
+        if "eve_proxy" not in st.session_state:
+            st.session_state.eve_proxy = EveProxyListener(
+                host="0.0.0.0", port=8503,
+                target_bob_ip=local_ips[0], target_bob_port=8502,
+                eve_frac=1.0,
+            )
+
         e_col1, e_col2 = st.columns([1, 1])
         with e_col1:
             eve_port_input = st.number_input("Eve Listener Port (Alice connects here)", value=8503, step=1, key="eve_proxy_port")
             target_bob_ip = st.text_input("Target Bob's Laptop IP", value=local_ips[0], key="eve_target_bob_ip")
             target_bob_port = st.number_input("Target Bob's Port", value=8502, step=1, key="eve_target_bob_port")
             eve_frac_proxy = st.slider("Eve Interception Fraction", 0.0, 1.0, 1.0, step=0.1, key="eve_proxy_frac")
-
-            # Initialize Eve Proxy Listener in session_state if missing
-            if "eve_proxy" not in st.session_state:
-                st.session_state.eve_proxy = EveProxyListener(
-                    host="0.0.0.0",
-                    port=eve_port_input,
-                    target_bob_ip=target_bob_ip,
-                    target_bob_port=target_bob_port,
-                    eve_frac=eve_frac_proxy,
-                )
 
             eve_proxy: EveProxyListener = st.session_state.eve_proxy
             eve_proxy.port = eve_port_input
@@ -935,17 +918,24 @@ with tab_net:
                     eve_proxy.stop()
                     st.rerun()
 
-            if eve_proxy.is_running:
-                st.success(f"🟢 Eve MITM Proxy ACTIVE on `0.0.0.0:{eve_proxy.port}` -> Forwarding to Bob at `{target_bob_ip}:{target_bob_port}`")
-                st.info(f"💡 **Alice (Laptop A)** should enter Eve's IP (`{local_ips[0]}`) and Port `{eve_proxy.port}` as the target IP/Port!")
-            else:
-                st.warning("🔴 Eve MITM Proxy is currently STOPPED.")
-
-            with st.expander("📋 Eve's Real-Time Interception Log", expanded=True):
-                if eve_proxy.logs:
-                    st.code("\n".join(eve_proxy.logs[-15:]), language="text")
+            # --- Live status + log panel: refreshes every 1 second without blocking ---
+            @st.fragment(run_every=1)
+            def eve_live_panel():
+                _ep = st.session_state.get("eve_proxy")
+                if _ep is None:
+                    return
+                if _ep.is_running:
+                    st.success(f"🟢 Eve MITM Proxy ACTIVE on `0.0.0.0:{_ep.port}` -> Forwarding to Bob at `{_ep.target_bob_ip}:{_ep.target_bob_port}`")
+                    st.info(f"💡 **Alice (Laptop A)** should enter Eve's IP (`{local_ips[0]}`) and Port `{_ep.port}` as the target IP/Port!")
                 else:
-                    st.caption("No proxy events yet. Start Eve Proxy and have Alice transmit to Eve's IP/port.")
+                    st.warning("🔴 Eve MITM Proxy is currently STOPPED.")
+                with st.expander("📋 Eve's Real-Time Interception Log", expanded=True):
+                    if _ep.logs:
+                        st.code("\n".join(_ep.logs[-15:]), language="text")
+                    else:
+                        st.caption("No proxy events yet. Start Eve Proxy and have Alice transmit to Eve's IP/port.")
+
+            eve_live_panel()
 
         with e_col2:
             st.markdown("#### 📊 Intercepted Sessions Dashboard")

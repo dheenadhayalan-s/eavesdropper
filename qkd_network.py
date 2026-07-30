@@ -230,7 +230,7 @@ class QKDNetworkListener:
             eve_intercepted_count = 0
 
             if self.eve_active:
-                self.log(f"🕵️ [EVE ATTACK ACTIVE] Eavesdropper tapping quantum channel at {self.eve_frac*100:.0f}% interception rate!")
+                self.log(f"🕵️ Eavesdropper (Eve) tapping quantum channel (Target rate: {self.eve_frac*100:.0f}%)")
                 for i in range(n_qubits):
                     if rng.random() < self.eve_frac:
                         eve_intercepted_count += 1
@@ -240,10 +240,9 @@ class QKDNetworkListener:
                             eve_result = transmitted_bits[i]
                         else:
                             eve_result = int(rng.integers(0, 2))
-                        # Eve resends in her basis (collapsing quantum state)
+                        # Eve resends in her basis
                         transmitted_bits[i] = eve_result
                         transmitted_bases[i] = eve_basis
-                self.log(f"⚡ [QUANTUM DISTURBANCE] Eve intercepted {eve_intercepted_count}/{n_qubits} qubits, collapsing states!")
 
             # Bob measurement result based on transmitted state & Bob basis
             bob_results = []
