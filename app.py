@@ -813,72 +813,87 @@ with tab_net:
             sample_frac_net = st.slider("QBER Sample Check Fraction", 0.1, 0.9, 0.5, step=0.1, key="net_sample_frac")
 
             st.markdown("---")
+            st.markdown("##### 🚀 Transmission Controls")
             eve_alice_toggle = st.toggle("🕵️ Simulate Eve Interception on Transmission Channel", value=False, key="net_alice_eve_toggle")
             eve_alice_frac = st.slider("Eve Interception Rate", 0.1, 1.0, 1.0, step=0.1, disabled=not eve_alice_toggle, key="net_alice_eve_frac")
 
-            btn_transmit = st.button("🚀 Transmit File via QKD ('Call Transmission')", type="primary", use_container_width=True, key="btn_transmit_net")
+            btn_col_a, btn_col_b = st.columns(2)
+            with btn_col_a:
+                btn_transmit = st.button("🚀 Transmit File via QKD", type="primary", use_container_width=True, key="btn_transmit_net")
+            with btn_col_b:
+                btn_attack_test = st.button("🚨 Run Eve Attack Test", type="secondary", use_container_width=True, key="btn_attack_test_net", help="Forces Eve interception ON to demonstrate ~25% QBER key rejection")
 
         with a_col2:
             st.markdown("#### 📡 Transmission Output Console")
-            if btn_transmit:
-                if uploaded_file is None:
-                    st.error("⚠️ Please select/upload a file first!")
-                else:
+            
+            # Trigger transmission if either button clicked
+            if btn_transmit or btn_attack_test:
+                # Force Eve active if attack test button pressed
+                active_eve = True if btn_attack_test else eve_alice_toggle
+                active_frac = eve_alice_frac if eve_alice_toggle else 1.0
+
+                if uploaded_file is not None:
                     file_bytes = uploaded_file.getvalue()
                     file_name = uploaded_file.name
                     mime_type = uploaded_file.type or "application/octet-stream"
+                else:
+                    # Default sample payload for quick testing
+                    file_name = "qkd_confidential_sample.txt"
+                    file_bytes = f"🔒 CONFIDENTIAL EAVEGUARD QKD DATA STREAM\nSession: Demo Test Payload\nTimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\nContent: High-security quantum encrypted text document.".encode("utf-8")
+                    mime_type = "text/plain"
+                    st.info(f"ℹ️ Using default sample payload: `{file_name}` ({len(file_bytes)} bytes)")
 
-                    st.markdown(f"**Starting transmission for file:** `{file_name}` ({len(file_bytes)} bytes)...")
-                    status_box = st.empty()
-                    log_lines = []
+                st.markdown(f"**Starting transmission for file:** `{file_name}` ({len(file_bytes)} bytes)...")
+                status_box = st.empty()
+                log_lines = []
 
-                    def update_status(msg):
-                        log_lines.append(msg)
-                        status_box.code("\n".join(log_lines[-8:]), language="text")
+                def update_status(msg):
+                    log_lines.append(msg)
+                    status_box.code("\n".join(log_lines[-8:]), language="text")
 
-                    with st.spinner("Executing QKD protocol over network socket..."):
-                        res = transmit_file_over_qkd(
-                            target_ip=target_ip,
-                            target_port=int(target_port),
-                            file_name=file_name,
-                            file_bytes=file_bytes,
-                            mime_type=mime_type,
-                            n_qubits=n_qubits_net,
-                            eve_active=eve_alice_toggle,
-                            eve_frac=eve_alice_frac,
-                            sample_fraction=sample_frac_net,
-                            status_callback=update_status,
-                        )
+                with st.spinner("Executing QKD protocol over network socket..."):
+                    res = transmit_file_over_qkd(
+                        target_ip=target_ip,
+                        target_port=int(target_port),
+                        file_name=file_name,
+                        file_bytes=file_bytes,
+                        mime_type=mime_type,
+                        n_qubits=n_qubits_net,
+                        eve_active=active_eve,
+                        eve_frac=active_frac,
+                        sample_fraction=sample_frac_net,
+                        status_callback=update_status,
+                    )
 
-                    if res.get("success"):
-                        st.success(
-                            f"🎉 **TRANSMISSION SUCCESSFUL!**\n\n"
-                            f"- File `{res['file_name']}` ({res['file_size']} bytes) transmitted securely!\n"
-                            f"- **Measured QBER:** `{res['qber_pct']:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                            f"- **AES-256 Key Established:** `{res['final_key_len']} bits`\n"
-                            f"- **Session ID:** `{res['session_id']}`"
+                if res.get("success"):
+                    st.success(
+                        f"🎉 **TRANSMISSION SUCCESSFUL!**\n\n"
+                        f"- File `{res['file_name']}` ({res['file_size']} bytes) transmitted securely!\n"
+                        f"- **Measured QBER:** `{res['qber_pct']:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                        f"- **AES-256 Key Established:** `{res['final_key_len']} bits`\n"
+                        f"- **Session ID:** `{res['session_id']}`"
+                    )
+                else:
+                    is_sec = res.get("is_secure", None)
+                    qber_val = res.get("qber_pct", None)
+
+                    if is_sec is False and qber_val is not None:
+                        st.error(
+                            f"🚨 **QKD TRANSMISSION BLOCKED! (Eavesdropper Detected)**\n\n"
+                            f"- **Measured QBER:** `{qber_val:.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                            f"- **Security Decision:** QKD key rejected due to quantum measurement disturbance!\n"
+                            f"- **Details:** {res.get('error', 'Eavesdropper detected on quantum channel.')}"
                         )
                     else:
-                        is_sec = res.get("is_secure", None)
-                        qber_val = res.get("qber_pct", None)
-
-                        if is_sec is False and qber_val is not None:
-                            st.error(
-                                f"🚨 **QKD TRANSMISSION BLOCKED! (Eavesdropper Detected)**\n\n"
-                                f"- **Measured QBER:** `{qber_val:.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                                f"- **Security Decision:** QKD key rejected due to quantum measurement disturbance!\n"
-                                f"- **Details:** {res.get('error', 'Eavesdropper detected on quantum channel.')}"
-                            )
-                        else:
-                            st.error(
-                                f"🔌 **NETWORK CONNECTION FAILED**\n\n"
-                                f"- **Reason:** {res.get('error', 'Connection timed out or refused.')}\n"
-                                f"- **Troubleshooting Check:**\n"
-                                f"  1. Is the Receiver Listener started on `{target_ip}:{target_port}`?\n"
-                                f"  2. For **Bob direct connection**, use Port `8502`.\n"
-                                f"  3. For **Eve 3-Laptop Proxy**, click **▶ Start Eve Proxy Listener** on Laptop C (Port `8503`) first.\n"
-                                f"  4. Check if both laptops are on the same Wi-Fi / LAN network."
-                            )
+                        st.error(
+                            f"🔌 **NETWORK CONNECTION FAILED**\n\n"
+                            f"- **Reason:** {res.get('error', 'Connection timed out or refused.')}\n"
+                            f"- **Troubleshooting Check:**\n"
+                            f"  1. Is the Receiver Listener started on `{target_ip}:{target_port}`?\n"
+                            f"  2. For **Bob direct connection**, use Port `8502`.\n"
+                            f"  3. For **Eve 3-Laptop Proxy**, click **▶ Start Eve Proxy Listener** on Laptop C (Port `8503`) first.\n"
+                            f"  4. Check if both laptops are on the same Wi-Fi / LAN network."
+                        )
             else:
                 st.info("Select target IP & file, then click **Transmit File via QKD** to begin.")
 
