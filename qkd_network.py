@@ -554,7 +554,16 @@ def transmit_file_over_qkd(
                     "is_secure": True,
                 }
 
-        return {"success": True, "session_id": session_id, "qber": qber, "qber_pct": qber_pct, "is_secure": True}
+        return {
+            "success": True,
+            "session_id": session_id,
+            "qber": qber,
+            "qber_pct": qber_pct,
+            "final_key_len": len(final_key_bits_alice),
+            "file_name": file_name,
+            "file_size": len(file_bytes),
+            "is_secure": True,
+        }
 
     except Exception as e:
         log(f"🚨 Transmission error: {e}")

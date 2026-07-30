@@ -865,12 +865,18 @@ with tab_net:
                         )
 
                     if res.get("success"):
+                        fname_out = res.get("file_name", file_name)
+                        fsize_out = res.get("file_size", len(file_bytes))
+                        keylen_out = res.get("final_key_len", "N/A")
+                        qber_out = res.get("qber_pct", 0.0)
+                        sess_out = res.get("session_id", "N/A")
+
                         st.success(
                             f"🎉 **TRANSMISSION SUCCESSFUL!**\n\n"
-                            f"- File `{res['file_name']}` ({res['file_size']} bytes) transmitted securely!\n"
-                            f"- **Measured QBER:** `{res['qber_pct']:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                            f"- **AES-256 Key Established:** `{res['final_key_len']} bits`\n"
-                            f"- **Session ID:** `{res['session_id']}`"
+                            f"- File `{fname_out}` ({fsize_out} bytes) transmitted securely!\n"
+                            f"- **Measured QBER:** `{qber_out:.2f}%` (Below {QBER_THRESHOLD*100:.0f}% threshold)\n"
+                            f"- **AES-256 Key Established:** `{keylen_out}` bits\n"
+                            f"- **Session ID:** `{sess_out}`"
                         )
                     else:
                         st.error(
