@@ -143,6 +143,7 @@ class QKDNetworkListener:
         self.server_socket: Optional[socket.socket] = None
         self.is_running = False
         self.last_received_file: Optional[Dict[str, Any]] = None
+        self.received_files: list = []
         self.last_qkd_session: Optional[Dict[str, Any]] = None
         self.logs: list = []
         self._thread: Optional[threading.Thread] = None
@@ -349,7 +350,7 @@ class QKDNetworkListener:
 
             if success:
                 self.log(f"🎉 FILE RECEIVED & DECRYPTED SECURELY! Filename: `{file_meta['filename']}` ({file_meta['size']} bytes)")
-                self.last_received_file = {
+                received_entry = {
                     "filename": file_meta["filename"],
                     "size": file_meta["size"],
                     "mime_type": file_meta.get("mime_type", "application/octet-stream"),
@@ -359,6 +360,8 @@ class QKDNetworkListener:
                     "decrypted_at": time.time(),
                     "status_msg": dec_msg,
                 }
+                self.last_received_file = received_entry
+                self.received_files.append(received_entry)
                 # Send ACK to Alice
                 self._send_msg(conn, json.dumps({"type": "FILE_RECEIVED", "status": "SUCCESS"}).encode("utf-8"))
             else:

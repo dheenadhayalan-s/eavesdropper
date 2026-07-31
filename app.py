@@ -740,11 +740,13 @@ with tab_net:
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
                 if st.button("▶ Start Receiver Listener", type="primary" if not listener.is_running else "secondary", key="btn_start_listen", use_container_width=True):
-                    listener.start()
+                    if not listener.is_running:
+                        listener.start()
                     st.rerun()
             with btn_col2:
                 if st.button("🛑 Stop Listener", key="btn_stop_listen", use_container_width=True):
-                    listener.stop()
+                    if listener.is_running:
+                        listener.stop()
                     st.rerun()
 
             # --- Live status + log panel: refreshes every 1 second without blocking ---
