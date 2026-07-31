@@ -190,6 +190,7 @@ class QKDNetworkListener:
         while self.is_running:
             try:
                 conn, addr = self.server_socket.accept()
+                conn.settimeout(60.0)
                 self.log(f"🤝 Connected to Transmitter (Alice) at {addr[0]}:{addr[1]}")
                 threading.Thread(target=self._handle_client, args=(conn, addr), daemon=True).start()
             except socket.timeout:
@@ -375,9 +376,12 @@ class QKDNetworkListener:
 
     def _recv_msg(self, conn: socket.socket) -> Optional[bytes]:
         try:
-            header = conn.recv(4)
-            if not header or len(header) < 4:
-                return None
+            header = b""
+            while len(header) < 4:
+                chunk = conn.recv(4 - len(header))
+                if not chunk:
+                    return None
+                header += chunk
             length = int.from_bytes(header, byteorder="big")
             chunks = []
             bytes_recvd = 0
@@ -519,10 +523,6 @@ def transmit_file_over_qkd(
                 "error": f"Transmission Aborted: Eavesdropper detected! QBER {qber_pct:.2f}% exceeds threshold.",
             }
 
-        # Print first 10 bits of the final key for debugging key consistency across laptops
-        key_preview_alice = "".join(str(b) for b in final_key_bits_alice[:10])
-        log(f"🔑 [DEBUG] Alice's Final Key (first 10 bits): {key_preview_alice} (len: {len(final_key_bits_alice)})")
-
         log(f"✅ QKD KEY SECURE! QBER {qber_pct:.2f}% is safe. Deriving AES-256 key...")
 
         # Extract Alice's secret key bits (excluding sample bits)
@@ -530,6 +530,10 @@ def transmit_file_over_qkd(
         final_key_bits_alice = [
             alice_bits[idx] for idx in matching_indices if idx not in sample_set
         ]
+
+        # Print first 10 bits of the final key for debugging key consistency across laptops
+        key_preview_alice = "".join(str(b) for b in final_key_bits_alice[:10])
+        log(f"🔑 [DEBUG] Alice's Final Key (first 10 bits): {key_preview_alice} (len: {len(final_key_bits_alice)})")
 
         # Derive AES Key
         aes_key = derive_aes_key(final_key_bits_alice)
@@ -596,9 +600,12 @@ def _send_msg(conn: socket.socket, data: bytes):
 
 def _recv_msg(conn: socket.socket) -> Optional[bytes]:
     try:
-        header = conn.recv(4)
-        if not header or len(header) < 4:
-            return None
+        header = b""
+        while len(header) < 4:
+            chunk = conn.recv(4 - len(header))
+            if not chunk:
+                return None
+            header += chunk
         length = int.from_bytes(header, byteorder="big")
         chunks = []
         bytes_recvd = 0
@@ -681,6 +688,7 @@ class EveProxyListener:
         while self.is_running:
             try:
                 alice_conn, alice_addr = self.server_socket.accept()
+                alice_conn.settimeout(60.0)
                 self.log(f"🕵️ Alice connected from {alice_addr[0]}:{alice_addr[1]} — Intercepting channel!")
                 threading.Thread(target=self._handle_mitm, args=(alice_conn, alice_addr), daemon=True).start()
             except socket.timeout:

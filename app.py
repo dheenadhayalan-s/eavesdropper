@@ -719,9 +719,11 @@ with tab_net:
         st.caption("Listens on TCP port for incoming QKD key exchanges & encrypted file payloads.")
 
         # Initialize network listener in session_state before rendering fragments
-        _port_init = 8502
-        if "network_listener" not in st.session_state:
-            st.session_state.network_listener = QKDNetworkListener(host="0.0.0.0", port=_port_init)
+        @st.cache_resource
+        def get_network_listener():
+            return QKDNetworkListener(host="0.0.0.0", port=8502)
+        
+        listener = get_network_listener()
 
         b_col1, b_col2 = st.columns([1, 1])
         with b_col1:
@@ -729,7 +731,8 @@ with tab_net:
             eve_listener = st.toggle("🕵️ Simulate Local Eve Interception on Bob Channel", value=False, key="net_eve_listen")
             eve_frac_listen = st.slider("Eve Interception Rate", 0.0, 1.0, 1.0, step=0.1, disabled=not eve_listener, key="net_eve_frac")
 
-            listener: QKDNetworkListener = st.session_state.network_listener
+            # Remove references to st.session_state
+            # listener is already get_network_listener()
             listener.port = port_input
             listener.eve_active = eve_listener
             listener.eve_frac = eve_frac_listen
@@ -747,7 +750,7 @@ with tab_net:
             # --- Live status + log panel: refreshes every 1 second without blocking ---
             @st.fragment(run_every=1)
             def bob_live_panel():
-                _listener = st.session_state.get("network_listener")
+                _listener = get_network_listener()
                 if _listener is None:
                     return
                 if _listener.is_running:
@@ -766,7 +769,7 @@ with tab_net:
         with b_col2:
             @st.fragment(run_every=1)
             def bob_received_files():
-                _listener = st.session_state.get("network_listener")
+                _listener = get_network_listener()
                 st.markdown("#### 📦 Received Files Workspace")
                 if _listener and _listener.last_received_file:
                     rf = _listener.last_received_file
@@ -894,12 +897,15 @@ with tab_net:
         st.caption("Runs on Laptop 3. Intercepts quantum qubits sent by Alice, measures in guessed bases, and forwards collapsed states to Bob.")
 
         # Initialize Eve Proxy Listener in session_state before fragments
-        if "eve_proxy" not in st.session_state:
-            st.session_state.eve_proxy = EveProxyListener(
+        @st.cache_resource
+        def get_eve_proxy():
+            return EveProxyListener(
                 host="0.0.0.0", port=8503,
-                target_bob_ip=local_ips[0], target_bob_port=8502,
+                target_bob_ip="127.0.0.1", target_bob_port=8502,
                 eve_frac=1.0,
             )
+        
+        eve_proxy = get_eve_proxy()
 
         e_col1, e_col2 = st.columns([1, 1])
         with e_col1:
@@ -908,7 +914,7 @@ with tab_net:
             target_bob_port = st.number_input("Target Bob's Port", value=8502, step=1, key="eve_target_bob_port")
             eve_frac_proxy = st.slider("Eve Interception Fraction", 0.0, 1.0, 1.0, step=0.1, key="eve_proxy_frac")
 
-            eve_proxy: EveProxyListener = st.session_state.eve_proxy
+            # Use the global eve_proxy
             eve_proxy.port = eve_port_input
             eve_proxy.target_bob_ip = target_bob_ip
             eve_proxy.target_bob_port = target_bob_port
@@ -927,7 +933,7 @@ with tab_net:
             # --- Live status + log panel: refreshes every 1 second without blocking ---
             @st.fragment(run_every=1)
             def eve_live_panel():
-                _ep = st.session_state.get("eve_proxy")
+                _ep = get_eve_proxy()
                 if _ep is None:
                     return
                 if _ep.is_running:
