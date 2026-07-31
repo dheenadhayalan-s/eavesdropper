@@ -25,7 +25,10 @@ from qiskit_circuit_demo import (
     get_example_circuits, build_full_qubit_circuit
 )
 
-from qkd_network import get_local_ip_addresses, QKDNetworkListener, EveProxyListener, transmit_file_over_qkd, QBER_THRESHOLD
+from qkd_network import (
+    get_local_ip_addresses, QKDNetworkListener, EveProxyListener,
+    transmit_file_over_qkd, QBER_THRESHOLD, PIPELINE_STEPS, init_pipeline_state
+)
 
 st.set_page_config(page_title="BB84 QKD Simulator", layout="wide")
 
@@ -88,6 +91,133 @@ div.stButton > button:hover {
 }
 </style>
 """, unsafe_allow_html=True)
+
+def render_transmission_pipeline(pipeline_state: dict, title: str = "🔒 Security & Transmission Pipeline"):
+    """
+    Renders a sleek, vertical cyberpunk timeline pipeline component on the side.
+    """
+    if not pipeline_state:
+        pipeline_state = init_pipeline_state()
+
+    steps = pipeline_state.get("steps", {})
+    completed_count = sum(1 for s in steps.values() if s.get("status") == "COMPLETED")
+    overall_status = pipeline_state.get("overall_status", "IDLE")
+    sess_id = pipeline_state.get("session_id", "")
+
+    if overall_status == "ABORTED" or overall_status == "FAILED":
+        progress_val = float(completed_count / 6.0)
+    elif overall_status == "SUCCESS":
+        progress_val = 1.0
+    else:
+        current = pipeline_state.get("current_step", 0)
+        progress_val = min(1.0, max(0.0, float((completed_count + (0.5 if current > 0 else 0)) / 6.0)))
+
+    # Header Card
+    sess_tag = f"`{sess_id}`" if sess_id else "STANDBY"
+    st.markdown(
+        f'<div style="background: linear-gradient(135deg, rgba(15,23,42,0.85), rgba(30,41,59,0.75)); '
+        f'border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;">'
+        f'<div style="display:flex; justify-content:space-between; align-items:center;">'
+        f'<span style="font-weight:700; font-size:13px; color:#f8fafc;">{title}</span>'
+        f'<span style="font-family:\'JetBrains Mono\',monospace; font-size:11px; color:#38bdf8;">{sess_tag}</span>'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Progress Indicator
+    p_col1, p_col2 = st.columns([3, 1])
+    with p_col1:
+        st.progress(progress_val)
+    with p_col2:
+        if overall_status == "SUCCESS":
+            st.markdown('<span style="color:#34d399; font-weight:700; font-size:11px;">🟢 100% DONE</span>', unsafe_allow_html=True)
+        elif overall_status == "ABORTED":
+            st.markdown('<span style="color:#f87171; font-weight:700; font-size:11px;">🚨 ABORTED</span>', unsafe_allow_html=True)
+        elif overall_status == "FAILED":
+            st.markdown('<span style="color:#f87171; font-weight:700; font-size:11px;">❌ FAILED</span>', unsafe_allow_html=True)
+        elif overall_status == "RUNNING":
+            st.markdown('<span style="color:#38bdf8; font-weight:700; font-size:11px;">🔄 ACTIVE</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span style="color:#94a3b8; font-weight:700; font-size:11px;">⚪ IDLE</span>', unsafe_allow_html=True)
+
+    # Render Vertical Timeline Stack
+    timeline_html = []
+    for idx, step_meta in enumerate(PIPELINE_STEPS, start=1):
+        step_id = step_meta["id"]
+        step_data = steps.get(step_id, {})
+        status = step_data.get("status", "PENDING")
+        detail = step_data.get("detail", step_meta["desc"])
+
+        if status == "COMPLETED":
+            dot_color = "#34d399"
+            badge_html = '<span style="background:rgba(6,95,70,0.5); color:#34d399; border:1px solid rgba(52,211,153,0.4); padding:1px 6px; border-radius:4px; font-weight:600; font-size:10px;">DONE</span>'
+            card_border = "rgba(52, 211, 153, 0.3)"
+            card_bg = "rgba(6, 95, 70, 0.15)"
+        elif status == "IN_PROGRESS":
+            dot_color = "#38bdf8"
+            badge_html = '<span style="background:rgba(30,58,138,0.6); color:#38bdf8; border:1px solid rgba(56,189,248,0.5); padding:1px 6px; border-radius:4px; font-weight:600; font-size:10px;">RUNNING</span>'
+            card_border = "rgba(56, 189, 248, 0.6)"
+            card_bg = "rgba(30, 58, 138, 0.25)"
+        elif status == "ABORTED":
+            dot_color = "#f87171"
+            badge_html = '<span style="background:rgba(127,29,29,0.6); color:#f87171; border:1px solid rgba(248,113,113,0.5); padding:1px 6px; border-radius:4px; font-weight:600; font-size:10px;">ABORTED</span>'
+            card_border = "rgba(248, 113, 113, 0.5)"
+            card_bg = "rgba(127, 29, 29, 0.2)"
+        elif status == "FAILED":
+            dot_color = "#f87171"
+            badge_html = '<span style="background:rgba(127,29,29,0.6); color:#f87171; border:1px solid rgba(248,113,113,0.5); padding:1px 6px; border-radius:4px; font-weight:600; font-size:10px;">FAILED</span>'
+            card_border = "rgba(248, 113, 113, 0.5)"
+            card_bg = "rgba(127, 29, 29, 0.2)"
+        else:
+            dot_color = "#475569"
+            badge_html = '<span style="background:rgba(30,41,59,0.5); color:#94a3b8; border:1px solid rgba(148,163,184,0.2); padding:1px 6px; border-radius:4px; font-weight:600; font-size:10px;">PENDING</span>'
+            card_border = "rgba(255, 255, 255, 0.06)"
+            card_bg = "rgba(15, 23, 42, 0.3)"
+
+        has_line = idx < 6
+        line_html = f'<div style="width:2px; height:24px; background:{dot_color}; opacity:0.3; margin:2px 0;"></div>' if has_line else ''
+
+        timeline_html.append(
+            f'<div style="display:flex; align-items:flex-start; margin-bottom:6px;">'
+            f'<div style="width:16px; display:flex; flex-direction:column; align-items:center; margin-right:8px; margin-top:4px;">'
+            f'<div style="width:10px; height:10px; border-radius:50%; background:{dot_color}; box-shadow:0 0 6px {dot_color};"></div>'
+            f'{line_html}'
+            f'</div>'
+            f'<div style="flex:1; background:{card_bg}; border:1px solid {card_border}; border-radius:6px; padding:6px 10px;">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">'
+            f'<span style="font-weight:600; font-size:11px; color:#e2e8f0;">{step_meta["icon"]} Step {step_id}: {step_meta["title"]}</span>'
+            f'{badge_html}'
+            f'</div>'
+            f'<div style="font-size:10px; color:#94a3b8; line-height:1.2;">{detail}</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    st.markdown("".join(timeline_html), unsafe_allow_html=True)
+
+
+# Sidebar Global QKD Node Monitor
+with st.sidebar:
+    st.markdown("### 🌐 QKD Node Quick Monitor")
+    local_ips = get_local_ip_addresses()
+    st.markdown(f"**Machine Local IP:** `{local_ips[0]}`")
+    
+    st.markdown("---")
+    st.markdown("#### 🔒 Protocol Security Rules")
+    st.markdown("- **Protocol:** BB84 Quantum Key Distribution")
+    st.markdown("- **Threshold Bound:** `QBER ≤ 11.0%`")
+    st.markdown("- **Cipher:** Authenticated AES-256 CTR + HMAC")
+
+    st.markdown("---")
+    # Blockchain Integrity Check
+    is_valid, bad_idx = audit_manager.blockchain.verify_chain()
+    if is_valid:
+        st.success(f"🔗 Blockchain Audit Verified ({len(audit_manager.blockchain.chain)} Blocks)")
+    else:
+        st.error(f"🚨 Chain Tampered at Block #{bad_idx}")
+
+    st.caption("EaveGuard BB84 Protocol Simulator")
+
 
 st.title("🔐 Quantum Key Distribution Simulator")
 st.caption("BB84 protocol — live eavesdropper detection & multi-laptop file transmission demo")
@@ -759,7 +889,12 @@ with tab_net:
                     st.success(f"🟢 Receiver Listener ACTIVE on `0.0.0.0:{_listener.port}` (Share IP `{local_ips[0]}`)")
                 else:
                     st.warning("🔴 Receiver Listener is currently STOPPED.")
-                with st.expander("📋 Bob's Real-Time Log Console", expanded=True):
+                
+                # Render Receiver Security Pipeline
+                p_state = getattr(_listener, "active_pipeline_state", None)
+                render_transmission_pipeline(p_state, title="📥 Receiver Security & Transmission Pipeline")
+
+                with st.expander("📋 Bob's Real-Time Log Console", expanded=False):
                     if _listener.logs:
                         st.code("\n".join(_listener.logs[-15:]), language="text")
                     else:
@@ -838,7 +973,7 @@ with tab_net:
             btn_transmit = st.button("🚀 Transmit File via QKD ('Call Transmission')", type="primary", use_container_width=True, key="btn_transmit_net")
 
         with a_col2:
-            st.markdown("#### 📡 Transmission Output Console")
+            st.markdown("#### 📡 Transmission Pipeline & Console")
             if btn_transmit:
                 if uploaded_file is None:
                     st.error("⚠️ Please select/upload a file first!")
@@ -848,12 +983,17 @@ with tab_net:
                     mime_type = uploaded_file.type or "application/octet-stream"
 
                     st.markdown(f"**Starting transmission for file:** `{file_name}` ({len(file_bytes)} bytes)...")
+                    pipeline_box = st.empty()
                     status_box = st.empty()
                     log_lines = []
 
                     def update_status(msg):
                         log_lines.append(msg)
-                        status_box.code("\n".join(log_lines[-8:]), language="text")
+                        status_box.code("\n".join(log_lines[-6:]), language="text")
+
+                    def update_pipeline(p_state):
+                        with pipeline_box.container():
+                            render_transmission_pipeline(p_state, title="📤 Sender Security Pipeline")
 
                     with st.spinner("Executing QKD protocol over network socket..."):
                         res = transmit_file_over_qkd(
@@ -867,7 +1007,13 @@ with tab_net:
                             eve_frac=eve_alice_frac,
                             sample_fraction=sample_frac_net,
                             status_callback=update_status,
+                            pipeline_callback=update_pipeline,
                         )
+
+                    # Render final state
+                    if res.get("pipeline_state"):
+                        with pipeline_box.container():
+                            render_transmission_pipeline(res["pipeline_state"], title="📤 Sender Security Pipeline")
 
                     if res.get("success"):
                         fname_out = res.get("file_name", file_name)
@@ -884,13 +1030,24 @@ with tab_net:
                             f"- **Session ID:** `{sess_out}`"
                         )
                     else:
+                        qber_pct_val = res.get("qber_pct")
+                        if qber_pct_val is not None:
+                            qber_info = f"`{qber_pct_val:.2f}%`"
+                            if qber_pct_val > QBER_THRESHOLD * 100:
+                                qber_info += f" (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)"
+                            else:
+                                qber_info += f" (Below {QBER_THRESHOLD*100:.0f}% threshold)"
+                        else:
+                            qber_info = "`N/A`"
+
                         st.error(
                             f"🚨 **TRANSMISSION ABORTED / FAILED!**\n\n"
                             f"- **Reason:** {res.get('error', 'Unknown error')}\n"
-                            f"- **Measured QBER:** `{res.get('qber_pct', 0.0):.2f}%` (Exceeds {QBER_THRESHOLD*100:.0f}% threshold)\n"
-                            f"- **Security Rule:** QKD key rejected due to quantum measurement disturbance."
+                            f"- **Measured QBER:** {qber_info}\n"
+                            f"- **Security Rule:** Key aborted or protocol execution error."
                         )
             else:
+                render_transmission_pipeline(None, title="📤 Sender Security Pipeline (Idle)")
                 st.info("Select target IP & file, then click **Transmit File via QKD** to begin.")
 
     # ------------------ SUB-TAB 3: MITM EAVESDROPPER PROXY (EVE) ------------------

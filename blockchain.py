@@ -148,6 +148,11 @@ class AuditManager:
             self.blockchain.initialize_chain()
             self.blockchain.save_chain(self.filepath)
 
+    def verify_chain(self) -> Tuple[bool, int]:
+        """Delegates chain verification to the underlying Blockchain object."""
+        self.load_audit_trail()
+        return self.blockchain.verify_chain()
+
     def log_simulation(
         self,
         session_id: str,

@@ -449,5 +449,31 @@
         },
         "previous_hash": "37325e1180f448387ca6d9bee7906113fcc9a45c4668cdb41ca8bffffc941636",
         "hash": "62882f90ea9772fafb2b43b526508a96d97e2f3b29ff8d10fbab1ed6c135053b"
+    },
+    {
+        "index": 35,
+        "timestamp": 1785470956.4981596,
+        "audit_data": {
+            "session_id": "NET-81818FAF",
+            "key_length": 94,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785470956.49756
+        },
+        "previous_hash": "62882f90ea9772fafb2b43b526508a96d97e2f3b29ff8d10fbab1ed6c135053b",
+        "hash": "19d08d0443712b5ea28947bea9173693998be907e53053751fa539d9e32a8f0c"
+    },
+    {
+        "index": 36,
+        "timestamp": 1785471144.6013803,
+        "audit_data": {
+            "session_id": "NET-A139B117",
+            "key_length": 97,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785471144.6006575
+        },
+        "previous_hash": "19d08d0443712b5ea28947bea9173693998be907e53053751fa539d9e32a8f0c",
+        "hash": "689b3d3ae2b3fbb6525fc6bf25a7765610500e17e21bfeffe930517f2e1f1047"
     }
 ]

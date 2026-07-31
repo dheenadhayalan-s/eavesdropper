@@ -26,6 +26,38 @@ from blockchain import AuditManager
 # Standard baseline threshold for QBER
 QBER_THRESHOLD = 0.11
 
+# Standard 6-Stage Transmission Security Pipeline
+PIPELINE_STEPS = [
+    {"id": 1, "key": "connect_init", "title": "Socket & QKD Init", "icon": "🔌", "desc": "Establish connection & generate qubit states"},
+    {"id": 2, "key": "sift_measure", "title": "Qubit Sifting & Basis Match", "icon": "⚛️", "desc": "Measure qubits & sift matching bases"},
+    {"id": 3, "key": "qber_audit", "title": "QBER & Eavesdropper Audit", "icon": "🔍", "desc": "Compare bit samples & verify ≤11% threshold"},
+    {"id": 4, "key": "key_encrypt", "title": "AES-256 Key & Encryption", "icon": "🔒", "desc": "Derive symmetric key & encrypt file payload"},
+    {"id": 5, "key": "transmit_payload", "title": "Encrypted Payload Streaming", "icon": "🚀", "desc": "Transmit encrypted payload over network"},
+    {"id": 6, "key": "decrypt_verify", "title": "Decryption & Integrity Check", "icon": "🔓", "desc": "Verify HMAC tag & decrypt received payload"},
+]
+
+
+def init_pipeline_state(session_id: str = "") -> Dict[str, Any]:
+    """Initialize a fresh 6-step pipeline tracking state dictionary."""
+    return {
+        "session_id": session_id,
+        "current_step": 0,
+        "overall_status": "IDLE",  # IDLE, RUNNING, SUCCESS, ABORTED, FAILED
+        "steps": {
+            s["id"]: {
+                "id": s["id"],
+                "key": s["key"],
+                "title": s["title"],
+                "icon": s["icon"],
+                "desc": s["desc"],
+                "status": "PENDING",  # PENDING, IN_PROGRESS, COMPLETED, ABORTED, FAILED
+                "detail": "",
+            }
+            for s in PIPELINE_STEPS
+        },
+    }
+
+
 
 def get_local_ip_addresses():
     """Detect local IP addresses on all active network interfaces."""
@@ -148,8 +180,35 @@ class QKDNetworkListener:
         self.logs: list = []
         self._thread: Optional[threading.Thread] = None
         self.audit_manager = AuditManager("blockchain.json")
+        self._active_pipeline_state: Dict[str, Any] = init_pipeline_state()
+
+    @property
+    def active_pipeline_state(self) -> Dict[str, Any]:
+        if not hasattr(self, "_active_pipeline_state") or self._active_pipeline_state is None:
+            self._active_pipeline_state = init_pipeline_state()
+        return self._active_pipeline_state
+
+    @active_pipeline_state.setter
+    def active_pipeline_state(self, val: Dict[str, Any]):
+        self._active_pipeline_state = val
+
+    def update_pipeline_step(self, step_id: int, status: str, detail: str = ""):
+        """Update active pipeline state step status for real-time visual progress."""
+        state = self.active_pipeline_state
+        state["current_step"] = step_id
+        if step_id in state["steps"]:
+            state["steps"][step_id]["status"] = status
+            if detail:
+                state["steps"][step_id]["detail"] = detail
+        if status in ["ABORTED", "FAILED"]:
+            state["overall_status"] = status
+        elif step_id == 6 and status == "COMPLETED":
+            state["overall_status"] = "SUCCESS"
+        elif status == "IN_PROGRESS":
+            state["overall_status"] = "RUNNING"
 
     def log(self, msg: str):
+
         timestamp = time.strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {msg}"
         self.logs.append(formatted)
@@ -221,6 +280,10 @@ class QKDNetworkListener:
             alice_bits_sent = msg.get("alice_bits")
             file_meta = msg.get("file_metadata")
 
+            self.active_pipeline_state = init_pipeline_state(session_id)
+            self.update_pipeline_step(1, "COMPLETED", f"Connected link for `{file_meta['filename']}` ({file_meta['size']}B)")
+            self.update_pipeline_step(2, "IN_PROGRESS", f"Measuring {n_qubits} qubits in random bases...")
+
             self.log(f"⚡ Starting QKD session `{session_id}` with {n_qubits} qubits for file: `{file_meta['filename']}`")
 
             # 2. Bob measures qubits in his own random bases
@@ -261,9 +324,13 @@ class QKDNetworkListener:
                 "bob_results": bob_results,
             }).encode("utf-8"))
 
+            self.update_pipeline_step(2, "COMPLETED", f"Measured {n_qubits} qubits. Sifting matching bases...")
+            self.update_pipeline_step(3, "IN_PROGRESS", "Performing public QBER bit-sample comparison...")
+
             # 3. Receive Basis Sifting & Public QBER check response from Alice
             sift_data_raw = self._recv_msg(conn)
             if not sift_data_raw:
+                self.update_pipeline_step(3, "FAILED", "Disconnected during basis sifting")
                 return
             sift_msg = json.loads(sift_data_raw.decode("utf-8"))
 
@@ -326,9 +393,13 @@ class QKDNetworkListener:
             }).encode("utf-8"))
 
             if not is_secure:
+                self.update_pipeline_step(3, "ABORTED", f"🚨 Eavesdropper detected! QBER {qber*100:.2f}% > 11% threshold.")
                 self.log(f"🚨 QKD KEY REJECTED! QBER {qber*100:.2f}% > {QBER_THRESHOLD*100:.0f}% threshold. Eavesdropper detected! Aborting transmission.")
                 conn.close()
                 return
+
+            self.update_pipeline_step(3, "COMPLETED", f"✅ QBER {qber*100:.2f}% safe (≤11% threshold)")
+            self.update_pipeline_step(4, "IN_PROGRESS", f"Deriving 256-bit AES key from {len(final_key_bits_bob)} secret bits...")
 
             # Print first 10 bits of the final key for debugging key consistency across laptops
             key_preview_bob = "".join(str(b) for b in final_key_bits_bob[:10])
@@ -336,11 +407,18 @@ class QKDNetworkListener:
 
             self.log(f"✅ QKD KEY ESTABLISHED SECURELY! Key length: {len(final_key_bits_bob)} bits. Waiting for encrypted file payload...")
 
+            self.update_pipeline_step(4, "COMPLETED", f"Derived 256-bit AES key from QKD secret key")
+            self.update_pipeline_step(5, "IN_PROGRESS", "Receiving AES-256 CTR + HMAC encrypted payload...")
+
             # 4. Receive Encrypted File Payload
             file_payload_raw = self._recv_msg(conn)
             if not file_payload_raw:
+                self.update_pipeline_step(5, "FAILED", "Failed to receive encrypted file payload")
                 return
             file_payload = json.loads(file_payload_raw.decode("utf-8"))
+
+            self.update_pipeline_step(5, "COMPLETED", "Encrypted payload received over socket")
+            self.update_pipeline_step(6, "IN_PROGRESS", "Authenticating HMAC tag & decrypting file...")
 
             # Derive AES key from Bob's secret key bits
             aes_key = derive_aes_key(final_key_bits_bob)
@@ -349,6 +427,7 @@ class QKDNetworkListener:
             success, file_bytes, dec_msg = decrypt_file_data(file_payload["encrypted_payload"], aes_key)
 
             if success:
+                self.update_pipeline_step(6, "COMPLETED", f"File `{file_meta['filename']}` verified & decrypted!")
                 self.log(f"🎉 FILE RECEIVED & DECRYPTED SECURELY! Filename: `{file_meta['filename']}` ({file_meta['size']} bytes)")
                 received_entry = {
                     "filename": file_meta["filename"],
@@ -365,6 +444,7 @@ class QKDNetworkListener:
                 # Send ACK to Alice
                 self._send_msg(conn, json.dumps({"type": "FILE_RECEIVED", "status": "SUCCESS"}).encode("utf-8"))
             else:
+                self.update_pipeline_step(6, "FAILED", f"HMAC authentication failed: {dec_msg}")
                 self.log(f"🚨 File decryption failed: {dec_msg}")
                 self._send_msg(conn, json.dumps({"type": "FILE_RECEIVED", "status": "DECRYPTION_FAILED"}).encode("utf-8"))
 
@@ -410,11 +490,30 @@ def transmit_file_over_qkd(
     eve_frac: float = 1.0,
     sample_fraction: float = 0.5,
     status_callback: Optional[Callable[[str], None]] = None,
+    pipeline_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     """
     Sender (Alice) function.
     Connects to Bob's IP/port, executes QKD protocol, encrypts file, and transmits payload.
     """
+    session_id = f"NET-{os.urandom(4).hex().upper()}"
+    pipeline_state = init_pipeline_state(session_id)
+
+    def update_step(step_id: int, status: str, detail: str = ""):
+        pipeline_state["current_step"] = step_id
+        if step_id in pipeline_state["steps"]:
+            pipeline_state["steps"][step_id]["status"] = status
+            if detail:
+                pipeline_state["steps"][step_id]["detail"] = detail
+        if status in ["ABORTED", "FAILED"]:
+            pipeline_state["overall_status"] = status
+        elif step_id == 6 and status == "COMPLETED":
+            pipeline_state["overall_status"] = "SUCCESS"
+        elif status == "IN_PROGRESS":
+            pipeline_state["overall_status"] = "RUNNING"
+        if pipeline_callback:
+            pipeline_callback(pipeline_state)
+
     def log(msg: str):
         if status_callback:
             status_callback(msg)
@@ -423,6 +522,7 @@ def transmit_file_over_qkd(
         except UnicodeEncodeError:
             print(f"[ALICE] {msg.encode('ascii', errors='replace').decode('ascii')}")
 
+    update_step(1, "IN_PROGRESS", f"Connecting to `{target_ip}:{target_port}`...")
     log(f"🔌 Connecting to Receiver at `{target_ip}:{target_port}`...")
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(10.0)
@@ -430,10 +530,10 @@ def transmit_file_over_qkd(
     try:
         s.connect((target_ip, target_port))
     except Exception as e:
-        return {"success": False, "error": f"Failed to connect to {target_ip}:{target_port} — {e}"}
+        update_step(1, "FAILED", f"Connection failed: {e}")
+        return {"success": False, "error": f"Failed to connect to {target_ip}:{target_port} — {e}", "pipeline_state": pipeline_state}
 
     rng = np.random.default_rng()
-    session_id = f"NET-{os.urandom(4).hex().upper()}"
 
     try:
         # 1. Generate Alice's random bits and bases
@@ -472,11 +572,14 @@ def transmit_file_over_qkd(
 
         # Send QKD_INIT payload
         _send_msg(s, json.dumps(init_payload).encode("utf-8"))
+        update_step(1, "COMPLETED", f"Connected link for `{file_name}`")
+        update_step(2, "IN_PROGRESS", f"Waiting for Bob to measure {n_qubits} qubits...")
 
         # 2. Wait for Bob's measurement response
         bob_resp_raw = _recv_msg(s)
         if not bob_resp_raw:
-            return {"success": False, "error": "No response received from Bob."}
+            update_step(2, "FAILED", "No measurement response from Bob")
+            return {"success": False, "error": "No response received from Bob.", "pipeline_state": pipeline_state}
         bob_resp = json.loads(bob_resp_raw.decode("utf-8"))
 
         bob_bases = bob_resp["bob_bases"]
@@ -488,13 +591,17 @@ def transmit_file_over_qkd(
         sifted_len = len(matching_indices)
 
         if sifted_len == 0:
-            return {"success": False, "error": "Zero matching bases found between Alice and Bob."}
+            update_step(2, "FAILED", "Zero matching bases")
+            return {"success": False, "error": "Zero matching bases found between Alice and Bob.", "pipeline_state": pipeline_state}
 
         # Select sample for public QBER check
         n_sample = max(1, int(sifted_len * sample_fraction))
         sample_positions = rng.choice(sifted_len, size=n_sample, replace=False).tolist()
         sample_indices = [matching_indices[pos] for pos in sample_positions]
         alice_sample_bits = [alice_bits[idx] for idx in sample_indices]
+
+        update_step(2, "COMPLETED", f"Matching bases sifted: {sifted_len} bits")
+        update_step(3, "IN_PROGRESS", f"Auditing {n_sample} public bit samples for QBER...")
 
         # Send sifting details to Bob
         log(f"🔍 Basis Sifting completed — Matching bases: {sifted_len} | Sacrificing {n_sample} bits for QBER check.")
@@ -508,7 +615,8 @@ def transmit_file_over_qkd(
         # 4. Receive Security Decision from Bob
         decision_raw = _recv_msg(s)
         if not decision_raw:
-            return {"success": False, "error": "Did not receive security decision from Bob."}
+            update_step(3, "FAILED", "Did not receive security decision")
+            return {"success": False, "error": "Did not receive security decision from Bob.", "pipeline_state": pipeline_state}
         decision = json.loads(decision_raw.decode("utf-8"))
 
         qber = decision["qber"]
@@ -516,6 +624,7 @@ def transmit_file_over_qkd(
         is_secure = decision["is_secure"]
 
         if not is_secure:
+            update_step(3, "ABORTED", f"🚨 Eavesdropper detected! QBER {qber_pct:.2f}% > 11%")
             log(f"🚨 QKD KEY REJECTED BY BOB! Measured QBER: {qber_pct:.2f}% > {QBER_THRESHOLD*100:.0f}% threshold. Eavesdropper detected!")
             return {
                 "success": False,
@@ -524,8 +633,11 @@ def transmit_file_over_qkd(
                 "qber_pct": qber_pct,
                 "is_secure": False,
                 "error": f"Transmission Aborted: Eavesdropper detected! QBER {qber_pct:.2f}% exceeds threshold.",
+                "pipeline_state": pipeline_state,
             }
 
+        update_step(3, "COMPLETED", f"✅ QBER {qber_pct:.2f}% safe (≤11%)")
+        update_step(4, "IN_PROGRESS", "Deriving 256-bit AES key & encrypting file payload...")
         log(f"✅ QKD KEY SECURE! QBER {qber_pct:.2f}% is safe. Deriving AES-256 key...")
 
         # Extract Alice's secret key bits (excluding sample bits)
@@ -545,6 +657,9 @@ def transmit_file_over_qkd(
         log(f"🔒 Encrypting file `{file_name}` ({len(file_bytes)} bytes) using QKD-derived secret key...")
         encrypted_payload = encrypt_file_data(file_bytes, aes_key)
 
+        update_step(4, "COMPLETED", f"File encrypted ({len(file_bytes)} bytes)")
+        update_step(5, "IN_PROGRESS", "Streaming encrypted AES payload over socket...")
+
         # 6. Send Encrypted File Payload over network socket
         log("🚀 Transmitting AES-256 encrypted file payload over network channel...")
         _send_msg(s, json.dumps({
@@ -552,11 +667,15 @@ def transmit_file_over_qkd(
             "encrypted_payload": encrypted_payload,
         }).encode("utf-8"))
 
+        update_step(5, "COMPLETED", "Encrypted payload transmitted")
+        update_step(6, "IN_PROGRESS", "Waiting for receiver HMAC & decryption ACK...")
+
         # Receive ACK from receiver
         ack_raw = _recv_msg(s)
         if ack_raw:
             ack = json.loads(ack_raw.decode("utf-8"))
             if ack.get("status") == "SUCCESS":
+                update_step(6, "COMPLETED", f"🎉 Verified & delivered `{file_name}`!")
                 log(f"🎉 TRANSMISSION COMPLETE & VERIFIED BY RECEIVER! File `{file_name}` delivered securely.")
                 return {
                     "success": True,
@@ -567,8 +686,10 @@ def transmit_file_over_qkd(
                     "file_name": file_name,
                     "file_size": len(file_bytes),
                     "is_secure": True,
+                    "pipeline_state": pipeline_state,
                 }
             else:
+                update_step(6, "FAILED", f"Receiver decryption failed: {ack.get('status')}")
                 log(f"🚨 Receiver rejected file payload: {ack.get('status')}")
                 return {
                     "success": False,
@@ -577,8 +698,10 @@ def transmit_file_over_qkd(
                     "qber_pct": qber_pct,
                     "is_secure": True,
                     "error": f"Receiver decryption failed ({ack.get('status')})",
+                    "pipeline_state": pipeline_state,
                 }
 
+        update_step(6, "FAILED", "No confirmation ACK received")
         log("⚠️ File payload sent, but no confirmation ACK received from receiver.")
         return {
             "success": False,
@@ -587,13 +710,16 @@ def transmit_file_over_qkd(
             "qber_pct": qber_pct,
             "is_secure": True,
             "error": "File payload transmitted, but receiver failed to send delivery receipt ACK.",
+            "pipeline_state": pipeline_state,
         }
 
     except Exception as e:
+        update_step(6, "FAILED", f"Error: {e}")
         log(f"🚨 Transmission error: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": str(e), "pipeline_state": pipeline_state}
     finally:
         s.close()
+
 
 
 def _send_msg(conn: socket.socket, data: bytes):
