@@ -1109,20 +1109,25 @@ with tab_net:
             eve_live_panel()
 
         with e_col2:
-            st.markdown("#### 📊 Intercepted Sessions Dashboard")
-            if eve_proxy.interceptions_history:
-                for idx, item in enumerate(reversed(eve_proxy.interceptions_history)):
-                    with st.expander(f"🕵️ Session #{len(eve_proxy.interceptions_history) - idx}: `{item['session_id']}`", expanded=True):
-                        st.markdown(f"**Target File:** `{item.get('filename', 'N/A')}`")
-                        st.markdown(f"**Total Qubits Intercepted:** `{item['n_qubits']}`")
-                        st.markdown(f"**Eve Hits:** `{item['eve_hits']}`")
-                        st.markdown(f"**QBER Induced on Bob:** `{item['qber_pct']:.2f}%`")
-                        if item['blocked']:
-                            st.error("🚨 **Transmission Blocked!** Bob detected high QBER and rejected key.")
-                        else:
-                            st.success("✅ Transmission Succeeded (Eve went unnoticed).")
-            else:
-                st.info("No intercepted sessions yet. Run a transmission from Alice targeting Eve's Proxy port (`8503`)!")
+            @st.fragment(run_every=1)
+            def eve_intercepted_dashboard():
+                _ep = get_eve_proxy()
+                st.markdown("#### 📊 Intercepted Sessions Dashboard")
+                if _ep and _ep.interceptions_history:
+                    for idx, item in enumerate(reversed(_ep.interceptions_history)):
+                        with st.expander(f"🕵️ Session #{len(_ep.interceptions_history) - idx}: `{item['session_id']}`", expanded=True):
+                            st.markdown(f"**Target File:** `{item.get('filename', 'N/A')}`")
+                            st.markdown(f"**Total Qubits Intercepted:** `{item['n_qubits']}`")
+                            st.markdown(f"**Eve Hits:** `{item['eve_hits']}`")
+                            st.markdown(f"**QBER Induced on Bob:** `{item['qber_pct']:.2f}%`")
+                            if item['blocked']:
+                                st.error("🚨 **Transmission Blocked!** Bob detected high QBER and rejected key.")
+                            else:
+                                st.success("✅ Transmission Succeeded (Eve went unnoticed).")
+                else:
+                    st.info("No intercepted sessions yet. Run a transmission from Alice targeting Eve's Proxy port!")
+
+            eve_intercepted_dashboard()
 
 
 

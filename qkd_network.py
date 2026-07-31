@@ -278,6 +278,8 @@ class QKDNetworkListener:
             n_qubits = msg["n_qubits"]
             alice_bases_sent = msg.get("alice_bases")
             alice_bits_sent = msg.get("alice_bits")
+            channel_bits = list(msg.get("channel_bits", alice_bits_sent))
+            channel_bases = list(msg.get("channel_bases", alice_bases_sent))
             file_meta = msg.get("file_metadata")
 
             self.active_pipeline_state = init_pipeline_state(session_id)
@@ -290,8 +292,6 @@ class QKDNetworkListener:
             bob_bases = rng.integers(0, 2, size=n_qubits).tolist()
 
             # Eve interception simulation on channel if Eve active on Bob's listener or in protocol
-            transmitted_bits = list(alice_bits_sent)
-            transmitted_bases = list(alice_bases_sent)
             eve_intercepted_count = 0
 
             if self.eve_active:
@@ -301,19 +301,19 @@ class QKDNetworkListener:
                         eve_intercepted_count += 1
                         eve_basis = int(rng.integers(0, 2))
                         # Eve measures in her basis
-                        if eve_basis == transmitted_bases[i]:
-                            eve_result = transmitted_bits[i]
+                        if eve_basis == channel_bases[i]:
+                            eve_result = channel_bits[i]
                         else:
                             eve_result = int(rng.integers(0, 2))
                         # Eve resends in her basis
-                        transmitted_bits[i] = eve_result
-                        transmitted_bases[i] = eve_basis
+                        channel_bits[i] = eve_result
+                        channel_bases[i] = eve_basis
 
-            # Bob measurement result based on transmitted state & Bob basis
+            # Bob measurement result based on transmitted channel state & Bob basis
             bob_results = []
             for i in range(n_qubits):
-                if bob_bases[i] == transmitted_bases[i]:
-                    bob_results.append(transmitted_bits[i])
+                if bob_bases[i] == channel_bases[i]:
+                    bob_results.append(channel_bits[i])
                 else:
                     bob_results.append(int(rng.integers(0, 2)))
 
@@ -561,8 +561,10 @@ def transmit_file_over_qkd(
             "type": "QKD_INIT",
             "session_id": session_id,
             "n_qubits": n_qubits,
-            "alice_bits": sent_bits,
-            "alice_bases": sent_bases,
+            "alice_bits": alice_bits,
+            "alice_bases": alice_bases,
+            "channel_bits": sent_bits,
+            "channel_bases": sent_bases,
             "file_metadata": {
                 "filename": file_name,
                 "size": len(file_bytes),
@@ -847,13 +849,13 @@ class EveProxyListener:
             n_qubits = alice_init["n_qubits"]
             alice_bits = alice_init["alice_bits"]
             alice_bases = alice_init["alice_bases"]
+            channel_bits = list(alice_init.get("channel_bits", alice_bits))
+            channel_bases = list(alice_init.get("channel_bases", alice_bases))
             file_meta = alice_init.get("file_metadata", {})
 
             self.log(f"⚡ Intercepted QKD init for session `{session_id}` ({n_qubits} qubits) for file `{file_meta.get('filename')}`")
 
             # 2. Eve active interception & state collapse
-            intercepted_bits = list(alice_bits)
-            intercepted_bases = list(alice_bases)
             eve_hits = 0
             eve_errors_introduced = 0
 
@@ -861,15 +863,15 @@ class EveProxyListener:
                 if rng.random() < self.eve_frac:
                     eve_hits += 1
                     eve_basis = int(rng.integers(0, 2))
-                    if eve_basis == alice_bases[i]:
-                        eve_result = alice_bits[i]
+                    if eve_basis == channel_bases[i]:
+                        eve_result = channel_bits[i]
                     else:
                         eve_result = int(rng.integers(0, 2))
-                        if eve_result != alice_bits[i]:
+                        if eve_result != channel_bits[i]:
                             eve_errors_introduced += 1
                     
-                    intercepted_bits[i] = eve_result
-                    intercepted_bases[i] = eve_basis
+                    channel_bits[i] = eve_result
+                    channel_bases[i] = eve_basis
 
             self.log(f"🕵️ Intercepted {eve_hits}/{n_qubits} qubits! Collapsed quantum state, introducing disturbance...")
 
@@ -878,8 +880,10 @@ class EveProxyListener:
                 "type": "QKD_INIT",
                 "session_id": session_id,
                 "n_qubits": n_qubits,
-                "alice_bits": intercepted_bits,
-                "alice_bases": intercepted_bases,
+                "alice_bits": alice_bits,
+                "alice_bases": alice_bases,
+                "channel_bits": channel_bits,
+                "channel_bases": channel_bases,
                 "file_metadata": file_meta,
             }
             _send_msg(bob_socket, json.dumps(forward_payload).encode("utf-8"))

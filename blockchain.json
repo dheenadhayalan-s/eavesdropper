@@ -475,5 +475,57 @@
         },
         "previous_hash": "19d08d0443712b5ea28947bea9173693998be907e53053751fa539d9e32a8f0c",
         "hash": "689b3d3ae2b3fbb6525fc6bf25a7765610500e17e21bfeffe930517f2e1f1047"
+    },
+    {
+        "index": 37,
+        "timestamp": 1785472098.5885918,
+        "audit_data": {
+            "session_id": "NET-8C715785",
+            "key_length": 98,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785472098.5870032
+        },
+        "previous_hash": "689b3d3ae2b3fbb6525fc6bf25a7765610500e17e21bfeffe930517f2e1f1047",
+        "hash": "026a53ce2cca68ef15c1d9bc00702c7f6d2a98d1e1c063870e5378cab9f33848"
+    },
+    {
+        "index": 38,
+        "timestamp": 1785472140.583092,
+        "audit_data": {
+            "session_id": "NET-3E6F66BA",
+            "key_length": 103,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785472140.5815763
+        },
+        "previous_hash": "026a53ce2cca68ef15c1d9bc00702c7f6d2a98d1e1c063870e5378cab9f33848",
+        "hash": "7cb6c447702292ddb1fb733835e3c619816b39754657fcfa05422f500f57b5dc"
+    },
+    {
+        "index": 39,
+        "timestamp": 1785472778.8007512,
+        "audit_data": {
+            "session_id": "NET-AAAE1BF7",
+            "key_length": 91,
+            "qber": 0.0,
+            "eve_detected": false,
+            "timestamp": 1785472778.7998688
+        },
+        "previous_hash": "7cb6c447702292ddb1fb733835e3c619816b39754657fcfa05422f500f57b5dc",
+        "hash": "61d185b082da27d52e85ddae34f692fd1ce91fb1177060dc38cf1d2d37e24f6e"
+    },
+    {
+        "index": 40,
+        "timestamp": 1785473192.1892185,
+        "audit_data": {
+            "session_id": "NET-F0728DB5",
+            "key_length": 97,
+            "qber": 0.25,
+            "eve_detected": true,
+            "timestamp": 1785473192.1887286
+        },
+        "previous_hash": "61d185b082da27d52e85ddae34f692fd1ce91fb1177060dc38cf1d2d37e24f6e",
+        "hash": "807d832b18929c0cb90598757d356118c0b6cdf73aa1ba2a022a2ed63becea73"
     }
 ]
